@@ -15,6 +15,8 @@ import {
 } from "react-native";
 import DeviceModal from "./DeviceConnectionModal";
 import useBLE from "./useBLE";
+// import eventEmitter from "../helpers/emitter";
+import DoorLock from "../models/device";
 
 const ConnectScreen = () => {
   const {
@@ -24,10 +26,29 @@ const ConnectScreen = () => {
     allDevices,
     connectToDevice,
     connectedDevice,
-    basicCharacteristic,
     disconnectFromDevice,
   } = useBLE();
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
+
+  const [device] = useState<DoorLock>(connectedDevice ?? new DoorLock());
+  const [basicInformation, setBasicInformation] = useState(
+    connectedDevice?.basicInformation ?? "NONE"
+  );
+  const [lockState, setLockState] = useState(
+    connectedDevice?.getLockState() ?? false
+  );
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (connectedDevice?.device.isConnected()) {
+      interval = setInterval(() => {
+        setBasicInformation(connectedDevice?.basicInformation ?? "NONE");
+        setLockState(connectedDevice?.getLockState() ?? false);
+      }, 1000);
+    }
+
+    return () => clearInterval(interval);
+  }, [device]);
 
   const scanForDevices = async () => {
     const isPermissionsEnabled = await requestPermissions();
@@ -53,8 +74,9 @@ const ConnectScreen = () => {
             <Text style={styles.deviceInformationTitleText}>
               Device Information:
             </Text>
+            <Text style={styles.deviceInformationText}>{basicInformation}</Text>
             <Text style={styles.deviceInformationText}>
-              {basicCharacteristic}
+              Lock State: {lockState ? "Locked" : "Unlocked"}
             </Text>
           </>
         ) : (

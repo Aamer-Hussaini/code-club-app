@@ -1,5 +1,5 @@
 /* eslint-disable no-bitwise */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PermissionsAndroid, Platform } from "react-native";
 import {
   BleError,
@@ -8,6 +8,8 @@ import {
   Device,
 } from "react-native-ble-plx";
 
+import DoorLock from "../models/device";
+
 import * as ExpoDevice from "expo-device";
 
 import base64 from "react-native-base64";
@@ -15,22 +17,25 @@ import base64 from "react-native-base64";
 const BASIC_SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 const BASIC_CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
+const DOOR_SERVICE_UUID = "d8cdbd56-4920-4e74-b780-68cec4f947df";
+const LOCK_STATE_CHARACTERISTIC_UUID = "c571ff3a-ceef-435b-8043-fbd479c7539f";
+
+let connectedDeviceModel: DoorLock | null = null;
+
 interface BluetoothLowEnergyApi {
   requestPermissions(): Promise<boolean>;
   scanForPeripherals(): void;
   stopScan(): void;
   connectToDevice: (deviceId: Device) => Promise<void>;
   disconnectFromDevice: () => void;
-  connectedDevice: Device | null;
+  connectedDevice: DoorLock | null;
   allDevices: Device[];
-  basicCharacteristic: string;
 }
 
 function useBLE(): BluetoothLowEnergyApi {
   const bleManager = useMemo(() => new BleManager(), []);
   const [allDevices, setAllDevices] = useState<Device[]>([]);
-  const [connectedDevice, setConnectedDevice] = useState<Device | null>(null);
-  const [basicCharacteristic, setBasicCharacteristic] = useState<string>("");
+  const [connectedDevice, setConnectedDevice] = useState<DoorLock | null>(null);
 
   /**
    * Handle permissions for Android platform
@@ -104,7 +109,7 @@ function useBLE(): BluetoothLowEnergyApi {
       }
       // if you would like to filter by device name, insert it inside the quotation marks
       // you can also scan for all available devices by removing the second part of the logical AND
-      if (device && device.name?.includes("Smart-Door-Lock")) {
+      if (device && device.name?.includes("Door")) {
         setAllDevices((prevState: Device[]) => {
           if (!isDuplicteDevice(prevState, device)) {
             return [...prevState, device];
@@ -122,21 +127,23 @@ function useBLE(): BluetoothLowEnergyApi {
   const connectToDevice = async (device: Device) => {
     try {
       const deviceConnection = await bleManager.connectToDevice(device.id);
-      setConnectedDevice(deviceConnection);
-      await deviceConnection.discoverAllServicesAndCharacteristics();
+      connectedDeviceModel = new DoorLock(deviceConnection)
+      setConnectedDevice(connectedDeviceModel);
+      await connectedDeviceModel?.device.discoverAllServicesAndCharacteristics();
       bleManager.stopDeviceScan();
-    //   startStreamingData(deviceConnection);
-    readBasicData(deviceConnection);
+      readBasicData(connectedDeviceModel?.device);
+      startStreamingData(connectedDeviceModel?.device);      
     } catch (e) {
       console.log("FAILED TO CONNECT", e);
     }
   };
 
   const disconnectFromDevice = () => {
-    if (connectedDevice) {
-      bleManager.cancelDeviceConnection(connectedDevice.id);
+    if (connectedDeviceModel?.device) {
+      bleManager.cancelDeviceConnection(connectedDeviceModel.device.id);
       setConnectedDevice(null);
-      setBasicCharacteristic("");
+      connectedDeviceModel.setBasicInformation("");
+      connectedDeviceModel.setLockState(false);
     }
   };
 
@@ -165,7 +172,27 @@ function useBLE(): BluetoothLowEnergyApi {
     //     Number(rawData[2].charCodeAt(2));
     // }
 
-    setBasicCharacteristic(rawData);
+    console.log("BASIC: " + rawData);
+
+    connectedDeviceModel?.setBasicInformation(rawData);
+  };
+
+  const onLockStateCharacteristicUpdate = (
+    error: BleError | null,
+    characteristic: Characteristic | null
+  ) => {
+    if (error) {
+      console.log(error);
+      return -1;
+    } else if (!characteristic?.value) {
+      console.log("No Data was recieved");
+      return -1;
+    }
+
+    const rawData = base64.decode(characteristic.value) == "true" ? true : false;
+    console.log("LOCK STATE: " + rawData);
+    console.log(connectedDeviceModel ?? "No Device Connected");
+    connectedDeviceModel?.setLockState(rawData);
   };
 
   const readBasicData = async (device: Device) => {
@@ -187,6 +214,15 @@ function useBLE(): BluetoothLowEnergyApi {
         BASIC_CHARACTERISTIC_UUID,
         onBasicCharacteristicUpdate
       );
+
+      device.monitorCharacteristicForService(
+        DOOR_SERVICE_UUID,
+        LOCK_STATE_CHARACTERISTIC_UUID,
+        onLockStateCharacteristicUpdate
+      );
+
+      console.log("Streaming Data");
+
     } else {
       console.log("No Device Connected");
     }
@@ -200,7 +236,6 @@ function useBLE(): BluetoothLowEnergyApi {
     allDevices,
     connectedDevice,
     disconnectFromDevice,
-    basicCharacteristic,
   };
 }
 
