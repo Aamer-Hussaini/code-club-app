@@ -34,16 +34,12 @@ const ConnectScreen = () => {
   const [basicInformation, setBasicInformation] = useState(
     connectedDevice?.basicInformation ?? "NONE"
   );
-  const [lockState, setLockState] = useState(
-    connectedDevice?.getLockState() ?? false
-  );
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (connectedDevice?.device.isConnected()) {
       interval = setInterval(() => {
         setBasicInformation(connectedDevice?.basicInformation ?? "NONE");
-        setLockState(connectedDevice?.getLockState() ?? false);
       }, 1000);
     }
 
@@ -75,9 +71,6 @@ const ConnectScreen = () => {
               Device Information:
             </Text>
             <Text style={styles.deviceInformationText}>{basicInformation}</Text>
-            <Text style={styles.deviceInformationText}>
-              Lock State: {lockState ? "Locked" : "Unlocked"}
-            </Text>
           </>
         ) : (
           <>

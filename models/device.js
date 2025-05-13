@@ -6,7 +6,6 @@ class DoorLock extends Device {
       super(device);
       this.device = device;
       this.basicInformation = "";
-      this.lockState = false;
     }
 
     setBasicInformation(info) {
@@ -17,16 +16,6 @@ class DoorLock extends Device {
     getBasicInformation()
     {
         return this.basicInformation;
-    }
-
-    setLockState(state) {
-        this.lockState = state;
-        console.log(this.lockState);
-        // eventEmitter.emit("lockStateUpdated", this.lockState);
-    }
-
-    getLockState() {
-        return this.lockState;
     }
 }
 

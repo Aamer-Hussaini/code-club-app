@@ -17,9 +17,6 @@ import base64 from "react-native-base64";
 const BASIC_SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 const BASIC_CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
-const DOOR_SERVICE_UUID = "d8cdbd56-4920-4e74-b780-68cec4f947df";
-const LOCK_STATE_CHARACTERISTIC_UUID = "c571ff3a-ceef-435b-8043-fbd479c7539f";
-
 let connectedDeviceModel: DoorLock | null = null;
 
 interface BluetoothLowEnergyApi {
@@ -143,7 +140,6 @@ function useBLE(): BluetoothLowEnergyApi {
       bleManager.cancelDeviceConnection(connectedDeviceModel.device.id);
       setConnectedDevice(null);
       connectedDeviceModel.setBasicInformation("");
-      connectedDeviceModel.setLockState(false);
     }
   };
 
@@ -177,24 +173,6 @@ function useBLE(): BluetoothLowEnergyApi {
     connectedDeviceModel?.setBasicInformation(rawData);
   };
 
-  const onLockStateCharacteristicUpdate = (
-    error: BleError | null,
-    characteristic: Characteristic | null
-  ) => {
-    if (error) {
-      console.log(error);
-      return -1;
-    } else if (!characteristic?.value) {
-      console.log("No Data was recieved");
-      return -1;
-    }
-
-    const rawData = base64.decode(characteristic.value) == "true" ? true : false;
-    console.log("LOCK STATE: " + rawData);
-    console.log(connectedDeviceModel ?? "No Device Connected");
-    connectedDeviceModel?.setLockState(rawData);
-  };
-
   const readBasicData = async (device: Device) => {
     if (device) {
       const characteristic = await device.readCharacteristicForService(
@@ -213,12 +191,6 @@ function useBLE(): BluetoothLowEnergyApi {
         BASIC_SERVICE_UUID,
         BASIC_CHARACTERISTIC_UUID,
         onBasicCharacteristicUpdate
-      );
-
-      device.monitorCharacteristicForService(
-        DOOR_SERVICE_UUID,
-        LOCK_STATE_CHARACTERISTIC_UUID,
-        onLockStateCharacteristicUpdate
       );
 
       console.log("Streaming Data");
