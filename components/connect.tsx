@@ -12,6 +12,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  TextInput
 } from "react-native";
 import DeviceModal from "./DeviceConnectionModal";
 import useBLE from "./useBLE";
@@ -27,28 +28,38 @@ const ConnectScreen = () => {
     connectToDevice,
     connectedDevice,
     disconnectFromDevice,
+    writeToCharacteristic
   } = useBLE();
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
 
   const [device] = useState<DoorLock>(connectedDevice ?? new DoorLock());
+  
   const [basicInformation, setBasicInformation] = useState(
     connectedDevice?.basicInformation ?? "NONE"
   );
-  const [lockState, setLockState] = useState(
-    connectedDevice?.getLockState() ?? false
+
+  const [sensorData, setSensorData] = useState(
+    connectedDevice?.sensorData ?? 0
   );
+
+  const [inputValue, setInputValue] = useState("");
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (connectedDevice?.device.isConnected()) {
       interval = setInterval(() => {
         setBasicInformation(connectedDevice?.basicInformation ?? "NONE");
-        setLockState(connectedDevice?.getLockState() ?? false);
+        setSensorData(connectedDevice?.sensorData ?? 0);
       }, 1000);
     }
 
     return () => clearInterval(interval);
   }, [device]);
+
+  const sendData = () => {
+    writeToCharacteristic(connectedDevice?.device, inputValue);
+    setInputValue("");
+  };
 
   const scanForDevices = async () => {
     const isPermissionsEnabled = await requestPermissions();
@@ -74,10 +85,24 @@ const ConnectScreen = () => {
             <Text style={styles.deviceInformationTitleText}>
               Device Information:
             </Text>
-            <Text style={styles.deviceInformationText}>{basicInformation}</Text>
-            <Text style={styles.deviceInformationText}>
-              Lock State: {lockState ? "Locked" : "Unlocked"}
-            </Text>
+            <Text style={styles.deviceInformationText}>Basic Information: {basicInformation}</Text>
+            
+            <Text style={styles.deviceInformationText}>Sensor Data: {sensorData}</Text>
+
+            <TextInput
+              style={styles.deviceInformationText}
+              placeholder="Enter some data"
+              value={inputValue}
+              onChangeText={setInputValue}
+            />
+            <TouchableOpacity
+              onPress={sendData}
+              style={styles.ctaButton}
+            >
+              <Text style={styles.ctaButtonText}>
+                Send Data Over
+              </Text>
+            </TouchableOpacity>
           </>
         ) : (
           <>
